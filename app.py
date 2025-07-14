@@ -20,7 +20,7 @@ text_pipe = pipeline(
     torch_dtype=torch.bfloat16,
 )
 
-#e endpoints
+#endpoints
 @app.post("/generate/text")
 async def generate_text(prompt: str = Form(...)):
     return text_pipe(prompt)
