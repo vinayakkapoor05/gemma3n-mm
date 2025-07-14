@@ -18,7 +18,7 @@ class GenerateResponse(BaseModel):
     text: str
 
 
-./app.post("/generate", response_model=GenerateResponse)
+@app.post("/generate", response_model=GenerateResponse)
 async def generate(
     prompt: str = Form(""),
     image: UploadFile | None = File(None),
