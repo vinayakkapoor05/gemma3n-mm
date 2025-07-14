@@ -1,5 +1,8 @@
 fastapi
-uvicorn 
-python-multipart 
-requests 
-openai
+uvicorn[standard]
+torch>=2.4.0
+transformers>=4.53.0
+huggingface_hub
+pillow
+accelerate
+timm
