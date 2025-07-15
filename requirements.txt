@@ -1,8 +1,8 @@
+accelerate 
+hf_transfer 
+timm 
+transformers 
+uvicorn[standard] 
 fastapi
-uvicorn[standard]
-torch>=2.4.0
-transformers>=4.53.0
-huggingface_hub
-pillow
-accelerate
-timm
+huggingface_hub 
+python-multipart

@@ -1,55 +1,80 @@
 # app.py
+import os
+from pathlib import Path
+import tempfile
+
 import torch
-from fastapi import FastAPI, UploadFile, File, Form
-from transformers import AutoProcessor, AutoModelForImageTextToText, pipeline
+from fastapi import FastAPI, HTTPException, UploadFile, File
+from transformers import pipeline
 
-app = FastAPI()
+torch.set_float32_matmul_precision('high')
+torch.backends.cuda.matmul.allow_tf32 = True
+torch.backends.cudnn.allow_tf32 = True
 
-MODEL_ID = "google/gemma-3n-e4b-it"
+DEVICE = 0 if torch.cuda.is_available() else -1
+DTYPE = torch.bfloat16 if DEVICE >= 0 else torch.float32
 
-processor = AutoProcessor.from_pretrained(MODEL_ID, device_map="auto")
-model = AutoModelForImageTextToText.from_pretrained(
-    MODEL_ID, torch_dtype="auto", device_map="auto"
-)
-model.eval()
-
+# Text-generation pipeline
+TEXT_MODEL = os.getenv("TEXT_MODEL", "google/gemma-3n-e4b-it")
 text_pipe = pipeline(
     "text-generation",
-    model="google/gemma-3-4b-it",
-    device=0,
-    torch_dtype=torch.bfloat16,
+    model=TEXT_MODEL,
+    device=DEVICE,
+    torch_dtype=DTYPE,
 )
 
-#endpoints
-@app.post("/generate/text")
-async def generate_text(prompt: str = Form(...)):
-    return text_pipe(prompt)
+# Image-to-text pipeline
+IMG_MODEL = os.getenv("IMG_MODEL", "google/gemma-3n-e4b-it")
+img_pipe = pipeline(
+    "image-text-to-text",
+    model=IMG_MODEL,
+    device=DEVICE,
+    torch_dtype=DTYPE,
+)
 
-@app.post("/generate/multimodal")
-async def generate_multimodal(
-    prompt: str = Form(...),
-    image: UploadFile = File(None),
-    audio: UploadFile = File(None),
-):
-    content = []
-    content.append({"type": "text", "text": prompt})
+app = FastAPI(title="Gemma-3n mm")
 
-    if image:
-        img_bytes = await image.read()
-        content.insert(0, {"type": "image", "image": img_bytes})
+@app.get("/health")
+async def health():
+    return {"status": "ok"}
 
-    if audio:
-        audio_bytes = await audio.read()
-        content.insert(0, {"type": "audio", "audio": audio_bytes})
+@app.post("/generate")
+async def generate(payload: dict):
+    if "inputs" in payload:
+        payload["text_inputs"] = payload.pop("inputs")
 
-    messages = [{"role": "user", "content": content}]
+    if "text_inputs" not in payload:
+        raise HTTPException(
+            status_code=400,
+            detail="Request JSON must include 'inputs'"
+        )
+    try:
+        outputs = text_pipe(**payload)
+        return {"generated": outputs}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
-    # preprocess + generate
-    inputs = processor.apply_chat_template(
-        messages, add_generation_prompt=True, tokenize=True,
-        return_dict=True, return_tensors="pt"
-    )
-    inputs = inputs.to(model.device, dtype=model.dtype)
-    outputs = model.generate(**inputs, max_new_tokens=128)
-    text = processor.batch_decode(outputs, skip_special_tokens=True)
-    return {"response": text[0]}
+@app.post("/caption")
+async def caption(image: UploadFile = File(...), text: str = None):
+    suffix = Path(image.filename).suffix or ".jpg"
+    tmp_path = None
+
+    try:
+        with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+            tmp.write(await image.read())
+            tmp_path = tmp.name
+
+        if text:
+            outputs = img_pipe(tmp_path, text=text)
+        else:
+            outputs = img_pipe(tmp_path)
+
+        return {"caption": outputs}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    finally:
+        if tmp_path and os.path.exists(tmp_path):
+            try: os.unlink(tmp_path)
+            except: pass
