@@ -56,6 +56,8 @@ RUN mkdir /wheels
 RUN uv pip install pynvml
 
 # Install requirements.txt
+COPY requirements.txt .
+
 RUN uv pip install -r requirements.txt
 
 # Clean uv cache

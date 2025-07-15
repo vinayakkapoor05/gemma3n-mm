@@ -1,80 +1,70 @@
-# app.py
 import os
-from pathlib import Path
-import tempfile
-
 import torch
-from fastapi import FastAPI, HTTPException, UploadFile, File
-from transformers import pipeline
+from fastapi import FastAPI, HTTPException
+from transformers import AutoProcessor, Gemma3nForConditionalGeneration
 
-torch.set_float32_matmul_precision('high')
-torch.backends.cuda.matmul.allow_tf32 = True
-torch.backends.cudnn.allow_tf32 = True
+# initialize model and processor
+MODEL_ID = os.getenv("IMG_MODEL", "google/gemma-3n-e4b-it")
+DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
-DEVICE = 0 if torch.cuda.is_available() else -1
-DTYPE = torch.bfloat16 if DEVICE >= 0 else torch.float32
-
-# Text-generation pipeline
-TEXT_MODEL = os.getenv("TEXT_MODEL", "google/gemma-3n-e4b-it")
-text_pipe = pipeline(
-    "text-generation",
-    model=TEXT_MODEL,
-    device=DEVICE,
-    torch_dtype=DTYPE,
+model = Gemma3nForConditionalGeneration.from_pretrained(
+    MODEL_ID,
+    torch_dtype=torch.bfloat16 if DEVICE == "cuda" else torch.float32,
+    device_map=0,
+    attn_implementation="eager"
+)
+processor = AutoProcessor.from_pretrained(
+    MODEL_ID,
+    padding_side="left"
 )
 
-# Image-to-text pipeline
-IMG_MODEL = os.getenv("IMG_MODEL", "google/gemma-3n-e4b-it")
-img_pipe = pipeline(
-    "image-text-to-text",
-    model=IMG_MODEL,
-    device=DEVICE,
-    torch_dtype=DTYPE,
-)
-
-app = FastAPI(title="Gemma-3n mm")
+app = FastAPI(title="Gemma-3n mm (raw model)")
 
 @app.get("/health")
 async def health():
     return {"status": "ok"}
 
-@app.post("/generate")
-async def generate(payload: dict):
-    if "inputs" in payload:
-        payload["text_inputs"] = payload.pop("inputs")
-
-    if "text_inputs" not in payload:
-        raise HTTPException(
-            status_code=400,
-            detail="Request JSON must include 'inputs'"
-        )
-    try:
-        outputs = text_pipe(**payload)
-        return {"generated": outputs}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
 @app.post("/caption")
-async def caption(image: UploadFile = File(...), text: str = None):
-    suffix = Path(image.filename).suffix or ".jpg"
-    tmp_path = None
+async def caption():
+    messages = [
+        {
+            "role": "system",
+            "content": [{"type": "text", "text": "You are a helpful assistant."}]
+        },
+        {
+            "role": "user",
+            "content": [
+                {
+                    "type": "image",
+                    "url": "https://huggingface.co/datasets/"
+                           "huggingface/documentation-images/"
+                           "resolve/main/pipeline-cat-chonk.jpeg"
+                },
+                {"type": "text", "text": "What is shown in this image?"},
+            ]
+        },
+    ]
 
     try:
-        with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
-            tmp.write(await image.read())
-            tmp_path = tmp.name
+        # tokenize + prepare inputs
+        inputs = processor.apply_chat_template(
+            messages,
+            tokenize=True,
+            return_dict=True,
+            return_tensors="pt",
+            add_generation_prompt=True,
+        ).to(DEVICE)
 
-        if text:
-            outputs = img_pipe(tmp_path, text=text)
-        else:
-            outputs = img_pipe(tmp_path)
+        # generate
+        output_ids = model.generate(
+            **inputs,
+            max_new_tokens=50,
+            cache_implementation="static"
+        )
 
-        return {"caption": outputs}
+        # decode output
+        caption = processor.decode(output_ids[0], skip_special_tokens=True)
+        return {"caption": caption}
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
-    finally:
-        if tmp_path and os.path.exists(tmp_path):
-            try: os.unlink(tmp_path)
-            except: pass
