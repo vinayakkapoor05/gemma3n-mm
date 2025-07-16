@@ -18,10 +18,13 @@ def build_raw_messages(msg_dicts: List[dict]) -> List[dict]:
                 'content': [{'type': 'text', 'text': m['content']}]
             })
         else:
-            raw.append({
-                'role': m['role'],
-                'content': [{'type': t, 'url': m['content']}]
-            })
+            entry = {'role': m['role'], 'content': [{'type': t}]}
+            if isinstance(m['content'], (bytes, bytearray)):
+                entry['content'][0]['bytes'] = m['content']
+            else:
+                entry['content'][0]['url'] = m['content']
+            raw.append(entry)
+
     return raw
 
 
@@ -32,8 +35,11 @@ def generate_response(raw_messages: List[dict], max_new_tokens: int) -> str:
         return_dict=True,
         return_tensors='pt',
         add_generation_prompt=True
-    ).to(DEVICE)
-
+    )
+    if DEVICE == "cuda":
+        inputs = inputs.to(device="cuda", dtype=torch.bfloat16)
+    else:
+        inputs = inputs.to(device="cpu")
     outputs = model.generate(
         **inputs,
         max_new_tokens=max_new_tokens,

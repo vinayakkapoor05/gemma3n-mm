@@ -6,3 +6,5 @@ uvicorn[standard]
 fastapi
 huggingface_hub 
 python-multipart
+librosa
+av

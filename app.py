@@ -25,5 +25,5 @@ core.DEVICE = DEVICE
 
 register_routes(app)
 
-GIST_URL = os.getenv("GIST_URL", "https://gist.githubusercontent.com/vinayakkapoor05/b890a7c317b24a850a4dca4c61ddc34d/raw")
+GIST_URL = os.getenv("GIST_URL", "")
 setup_periodic_tasks(app, GIST_URL)
