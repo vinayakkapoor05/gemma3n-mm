@@ -1,2 +1,3 @@
-docker build -t gemma3n-mm .
-docker run --gpus all -e HF_TOKEN=<your_hf_token> -p 8000:8000 --shm-size=1g -v ~/.cache/huggingface:/root/.cache/huggingface gemma3n-mm:latest
+docker build -t gemma3n:dev --target build-base .
+
+docker run --gpus all -it --rm   -v "$(pwd)":/workspace   -v ~/.cache/huggingface:/root/.cache/huggingface   -e HF_TOKEN="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"   -w /workspace   -p 8080:8000   gemma3n:dev
