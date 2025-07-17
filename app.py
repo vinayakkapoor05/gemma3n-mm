@@ -6,6 +6,7 @@ from transformers import AutoProcessor, Gemma3nForConditionalGeneration
 from src.routes import register_routes
 import src.core as core
 
+print("Starting Gemma-3n")
 MODEL_ID = os.getenv("IMG_MODEL", "google/gemma-3n-e4b-it")
 DEVICE   = "cuda" if torch.cuda.is_available() else "cpu"
 
