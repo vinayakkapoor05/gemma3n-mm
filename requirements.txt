@@ -1,3 +1,5 @@
+pywaggle[vision]==0.56.0
+
 accelerate 
 hf_transfer 
 timm 
@@ -8,3 +10,5 @@ huggingface_hub
 python-multipart
 librosa
 av
+pillow
+requests
