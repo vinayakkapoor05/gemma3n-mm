@@ -4,7 +4,6 @@ import torch
 from fastapi import FastAPI
 from transformers import AutoProcessor, Gemma3nForConditionalGeneration
 from src.routes import register_routes
-from src.periodic import setup_periodic_tasks
 import src.core as core
 
 MODEL_ID = os.getenv("IMG_MODEL", "google/gemma-3n-e4b-it")
@@ -24,6 +23,3 @@ core.processor = processor
 core.DEVICE = DEVICE
 
 register_routes(app)
-
-GIST_URL = os.getenv("GIST_URL", "")
-setup_periodic_tasks(app, GIST_URL)
