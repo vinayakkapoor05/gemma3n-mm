@@ -12,3 +12,5 @@ librosa
 av
 pillow
 requests
+schedule
+pyyaml

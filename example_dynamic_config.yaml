@@ -1,0 +1,22 @@
+# Example Dynamic Prompting Configuration
+
+# Custom system prompt
+system_prompt: |
+  You are an expert image analyst.
+
+# Custom user prompt
+user_prompt: |
+  Please analyze the current environment and provide a detailed assessment. 
+  Include information about:
+  - Who or what is present in the scene
+  - Any movements or activities detected
+  - Audio patterns or sounds of interest
+  - Overall environment status and any recommendations
+
+# Can be any combination of: image, audio, video
+modes:
+  - image
+  - audio
+
+# Max tokens to generate in the response
+max_tokens: 250
