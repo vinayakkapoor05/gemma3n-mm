@@ -1,26 +1,13 @@
 # app.py
-import os
-import torch
 from fastapi import FastAPI
-from transformers import AutoProcessor, Gemma3nForConditionalGeneration
 from src.routes import register_routes
 import src.core as core
 
 print("Starting Gemma-3n")
-MODEL_ID = os.getenv("IMG_MODEL", "google/gemma-3n-e4b-it")
-DEVICE   = "cuda" if torch.cuda.is_available() else "cpu"
-
-model = Gemma3nForConditionalGeneration.from_pretrained(
-    MODEL_ID,
-    torch_dtype=(torch.bfloat16 if DEVICE == "cuda" else torch.float32),
-    device_map=0
-)
-processor = AutoProcessor.from_pretrained(MODEL_ID, padding_side="left")
 
 app = FastAPI(title="Gemma-3n Multimodal")
 
-core.model = model
-core.processor = processor
-core.DEVICE = DEVICE
+# initialize model and processor
+core.initialize_model()
 
 register_routes(app)

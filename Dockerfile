@@ -52,6 +52,34 @@ RUN uv clean && \
 ENV HF_HUB_ENABLE_HF_TRANSFER=1
 ENV HF_TOKEN=""
 
+# create a local cache directory for the model
+RUN mkdir -p /hf_cache/google/gemma-3n-e4b-it
+
+ENV HF_HOME=/hf_cache
+ARG HF_TOKEN=""
+ENV HF_TOKEN=${HF_TOKEN}
+
+# Download the model only if HF_TOKEN is provided
+RUN if [ -n "$HF_TOKEN" ]; then \
+    echo "Downloading Gemma-3n model with authentication..."; \
+    huggingface-cli download \
+        google/gemma-3n-e4b-it \
+        --repo-type model \
+        --cache-dir /hf_cache \
+        --local-dir /hf_cache/google/gemma-3n-e4b-it \
+        --resume \
+        --force; \
+    echo "Model downloaded successfully"; \
+else \
+    echo "No HF_TOKEN provided, model will be downloaded at runtime"; \
+fi
+
+# Copy project files
+WORKDIR /app
+COPY main.py app.py ./
+COPY src/ ./src/
+COPY *.py ./
+
 EXPOSE 8000
 
-ENTRYPOINT ["python3", "main.py"]
+ENTRYPOINT ["python3", "gemma3n.py"]
