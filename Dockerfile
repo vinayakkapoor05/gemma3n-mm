@@ -28,7 +28,6 @@ RUN --mount=type=cache,id=pip_cache,target=/root/.cache/pip \
       torch torchvision torchaudio triton \
       uvicorn[standard] fastapi \
       --extra-index-url https://download.pytorch.org/whl/cu128
-
 FROM venv AS build
 WORKDIR /wheels
 
@@ -55,14 +54,13 @@ RUN --mount=type=secret,id=hf_token \
         --local-dir /hf_cache/google/gemma-3n-e4b-it \
         --resume --force \
     '
-
 FROM nvidia/cuda:${CUDA_VERSION}-runtime-${IMAGE_DISTRO} AS runtime
 
 RUN --mount=type=cache,id=apt_lists_rt,target=/var/lib/apt/lists \
     --mount=type=cache,id=apt_archives_rt,target=/var/cache/apt/archives \
     apt-get update && \
     apt-get install -y --no-install-recommends \
-      python3 libexpat1 zlib1g libbz2-1.0 liblzma5 libffi7 && \
+      python3 python3-distutils libexpat1 zlib1g libbz2-1.0 liblzma5 libffi7 && \
     rm -rf /var/lib/apt/lists/*
 
 ENV PATH=/opt/venv/bin:$PATH \
@@ -73,6 +71,14 @@ COPY --from=build /hf_cache /hf_cache
 RUN pip uninstall -y opencv-python && \
     pip install --no-cache-dir opencv-python-headless
 
+RUN --mount=type=cache,id=apt_lists_rt,target=/var/lib/apt/lists \
+    --mount=type=cache,id=apt_archives_rt,target=/var/cache/apt/archives \
+    mkdir -p /var/lib/apt/lists/partial && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
+      python3 python3-distutils libexpat1 zlib1g libbz2-1.0 liblzma5 libffi7 && \
+    rm -rf /var/lib/apt/lists/partial/*
+
 WORKDIR /app
 COPY gemma3n.py main.py app.py waggle_cli.py cli.py /app/
 COPY src/ /app/src/
@@ -80,8 +86,6 @@ COPY src/ /app/src/
 RUN if [ -d /app/src ] && [ ! -f /app/src/__init__.py ]; then \
       touch /app/src/__init__.py; \
     fi
-
-ENV PYTHONPATH=/app:$PYTHONPATH
 
 EXPOSE 8000
 ENTRYPOINT ["python3", "gemma3n.py"]
