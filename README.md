@@ -104,3 +104,4 @@ python cli.py dynamic-prompting --yaml-url "https://gist.githubusercontent.com/u
 ### Utility Endpoints
 - `GET /health` - Health check
 - `GET /endpoints` - List all available endpoints
+
