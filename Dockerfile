@@ -1,25 +1,16 @@
+# syntax=docker/dockerfile:1.4
 ARG CUDA_VERSION=12.8.1
 ARG IMAGE_DISTRO=ubuntu22.04
-ARG PYTHON_VERSION=3.12
 
-FROM nvcr.io/nvidia/cuda:${CUDA_VERSION}-devel-${IMAGE_DISTRO} AS base
+FROM nvidia/cuda:${CUDA_VERSION}-devel-${IMAGE_DISTRO} AS deps
+ENV DEBIAN_FRONTEND=noninteractive \
+    CC=/usr/bin/gcc-12 CXX=/usr/bin/g++-12
 
-ARG MAX_JOBS=32
-ARG NVCC_THREADS=2
-ARG TORCH_CUDA_ARCH_LIST="9.0a"
-
-ENV MAX_JOBS=${MAX_JOBS} \
-    NVCC_THREADS=${NVCC_THREADS} \
-    TORCH_CUDA_ARCH_LIST=${TORCH_CUDA_ARCH_LIST} \
-    DEBIAN_FRONTEND=noninteractive \
-    CC=/usr/bin/gcc-12 \
-    CXX=/usr/bin/g++-12 \
-    CUDA_HOME=/usr/local/cuda \
-    LD_LIBRARY_PATH=/usr/local/cuda/lib64:${LD_LIBRARY_PATH}
-
-RUN apt update && apt upgrade -y && \
-    apt install -y --no-install-recommends \ 
-    python3 python3-venv python3-distutils \       
+RUN --mount=type=cache,id=apt_lists,target=/var/lib/apt/lists \
+    --mount=type=cache,id=apt_archives,target=/var/cache/apt/archives \
+    apt-get update && apt-get upgrade -y && \
+    apt-get install -y --no-install-recommends \
+      python3 python3-venv python3-distutils \
       curl gcc-12 g++-12 git \
       libibverbs-dev libjpeg-turbo8-dev libpng-dev zlib1g-dev && \
     rm -rf /var/lib/apt/lists/*
@@ -27,59 +18,66 @@ RUN apt update && apt upgrade -y && \
 RUN curl -LsSf https://astral.sh/uv/install.sh \
     | env UV_INSTALL_DIR=/usr/local/bin sh
 
-ARG PYTHON_VERSION
-RUN uv venv -p python3 --seed --python-preference only-managed /opt/venv
-ENV VIRTUAL_ENV=/opt/venv \
-    PATH=/opt/venv/bin:$PATH
+FROM deps AS venv
 
-FROM base AS torch-base
-RUN uv pip install -U \
+RUN python3 -m venv --copies /opt/venv
+ENV PATH=/opt/venv/bin:$PATH
+
+RUN --mount=type=cache,id=pip_cache,target=/root/.cache/pip \
+    uv pip install -U \
       torch torchvision torchaudio triton \
-      --index-url https://download.pytorch.org/whl/cu128
+      uvicorn[standard] fastapi \
+      --extra-index-url https://download.pytorch.org/whl/cu128
 
-FROM torch-base AS build-base
+FROM venv AS build
+WORKDIR /wheels
 
-RUN mkdir /wheels
 RUN uv pip install pynvml
+
 COPY requirements.txt .
-RUN uv pip install -r requirements.txt
+RUN --mount=type=cache,id=pip_cache,target=/root/.cache/pip \
+    uv pip install -r requirements.txt
 
 RUN uv clean && \
-    apt autoremove --purge -y && \
-    apt clean && \
+    apt-get autoremove --purge -y && \
+    apt-get clean && \
     rm -rf /var/cache/apt/*
 
-ENV HF_HUB_ENABLE_HF_TRANSFER=1
-ENV HF_TOKEN=""
-
-# create a local cache directory for the model
+ENV HF_HOME=/hf_cache
 RUN mkdir -p /hf_cache/google/gemma-3n-e4b-it
 
-ENV HF_HOME=/hf_cache
-ARG HF_TOKEN=""
-ENV HF_TOKEN=${HF_TOKEN}
-
-# Download the model only if HF_TOKEN is provided
-RUN if [ -n "$HF_TOKEN" ]; then \
-    echo "Downloading Gemma-3n model with authentication..."; \
-    huggingface-cli download \
-        google/gemma-3n-e4b-it \
+RUN --mount=type=secret,id=hf_token \
+    bash -euxc ' \
+      export HF_TOKEN="$(cat /run/secrets/hf_token)" && \
+      huggingface-cli download google/gemma-3n-e4b-it \
         --repo-type model \
         --cache-dir /hf_cache \
         --local-dir /hf_cache/google/gemma-3n-e4b-it \
-        --resume \
-        --force; \
-    echo "Model downloaded successfully"; \
-else \
-    echo "No HF_TOKEN provided, model will be downloaded at runtime"; \
-fi
+        --resume --force \
+    '
+FROM nvidia/cuda:${CUDA_VERSION}-runtime-${IMAGE_DISTRO} AS runtime
 
-# Copy project files
+RUN --mount=type=cache,id=apt_lists_rt,target=/var/lib/apt/lists \
+    --mount=type=cache,id=apt_archives_rt,target=/var/cache/apt/archives \
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
+      python3 libexpat1 zlib1g libbz2-1.0 liblzma5 libffi7 && \
+    rm -rf /var/lib/apt/lists/*
+
+ENV PATH=/opt/venv/bin:$PATH \
+    HF_HOME=/hf_cache
+COPY --from=build /opt/venv    /opt/venv
+COPY --from=build /hf_cache   /hf_cache
+
 WORKDIR /app
-COPY main.py app.py ./
-COPY src/ ./src/
-COPY *.py ./
+COPY gemma3n.py main.py app.py /app/
+COPY src/ /app/src/
+
+RUN if [ -d /app/src ] && [ ! -f /app/src/__init__.py ]; then \
+      touch /app/src/__init__.py; \
+    fi
+
+ENV PYTHONPATH=/app:$PYTHONPATH
 
 EXPOSE 8000
-
 ENTRYPOINT ["python3", "gemma3n.py"]
