@@ -55,6 +55,7 @@ RUN --mount=type=secret,id=hf_token \
         --local-dir /hf_cache/google/gemma-3n-e4b-it \
         --resume --force \
     '
+
 FROM nvidia/cuda:${CUDA_VERSION}-runtime-${IMAGE_DISTRO} AS runtime
 
 RUN --mount=type=cache,id=apt_lists_rt,target=/var/lib/apt/lists \
@@ -66,11 +67,14 @@ RUN --mount=type=cache,id=apt_lists_rt,target=/var/lib/apt/lists \
 
 ENV PATH=/opt/venv/bin:$PATH \
     HF_HOME=/hf_cache
-COPY --from=build /opt/venv    /opt/venv
-COPY --from=build /hf_cache   /hf_cache
+COPY --from=build /opt/venv /opt/venv
+COPY --from=build /hf_cache /hf_cache
+
+RUN pip uninstall -y opencv-python && \
+    pip install --no-cache-dir opencv-python-headless
 
 WORKDIR /app
-COPY gemma3n.py main.py app.py /app/
+COPY gemma3n.py main.py app.py waggle_cli.py cli.py /app/
 COPY src/ /app/src/
 
 RUN if [ -d /app/src ] && [ ! -f /app/src/__init__.py ]; then \
