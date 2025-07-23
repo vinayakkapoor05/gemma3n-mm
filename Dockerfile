@@ -1,15 +1,14 @@
 # syntax=docker/dockerfile:1.4
 ARG CUDA_VERSION=12.8.1
 ARG IMAGE_DISTRO=ubuntu22.04
-ARG TARGETARCH
 
 FROM nvidia/cuda:${CUDA_VERSION}-devel-${IMAGE_DISTRO} AS deps
+ARG TARGETARCH
 ENV DEBIAN_FRONTEND=noninteractive \
     CC=/usr/bin/gcc-12 CXX=/usr/bin/g++-12
 
-RUN --mount=type=cache,id=apt_lists_${TARGETARCH},target=/var/lib/apt/lists \
-    --mount=type=cache,id=apt_archives_${TARGETARCH},target=/var/cache/apt/archives \
-    apt-get update && apt-get upgrade -y && \
+RUN apt-get update && \
+    apt-get upgrade -y && \
     apt-get install -y --no-install-recommends \
       python3 python3-venv python3-distutils \
       curl gcc-12 g++-12 git \
@@ -24,8 +23,7 @@ FROM deps AS venv
 RUN python3 -m venv --copies /opt/venv
 ENV PATH=/opt/venv/bin:$PATH
 
-RUN --mount=type=cache,id=pip_cache_${TARGETARCH},target=/root/.cache/pip \
-    uv pip install -U \
+RUN uv pip install -U \
       torch torchvision torchaudio triton \
       uvicorn[standard] fastapi \
       --extra-index-url https://download.pytorch.org/whl/cu128
@@ -36,8 +34,7 @@ WORKDIR /wheels
 RUN uv pip install pynvml
 
 COPY requirements.txt .
-RUN --mount=type=cache,id=pip_cache_${TARGETARCH},target=/root/.cache/pip \
-    uv pip install -r requirements.txt
+RUN uv pip install -r requirements.txt
 
 RUN uv clean && \
     apt-get autoremove --purge -y && \
@@ -59,9 +56,7 @@ RUN --mount=type=secret,id=hf_token \
 
 FROM nvidia/cuda:${CUDA_VERSION}-runtime-${IMAGE_DISTRO} AS runtime
 
-RUN --mount=type=cache,id=apt_lists_rt_${TARGETARCH},target=/var/lib/apt/lists \
-    --mount=type=cache,id=apt_archives_rt_${TARGETARCH},target=/var/cache/apt/archives \
-    apt-get update && \
+RUN apt-get update && \
     apt-get install -y --no-install-recommends \
       python3 python3-distutils libexpat1 zlib1g libbz2-1.0 liblzma5 libffi7 && \
     rm -rf /var/lib/apt/lists/*
