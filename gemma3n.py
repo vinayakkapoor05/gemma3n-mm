@@ -96,6 +96,10 @@ def waggle_command(args):
 
 def main():
     parser = argparse.ArgumentParser(description='Gemma3n - Multimodal AI Tool')
+    
+    parser.add_argument('--hf-token', type=str, 
+                       help='Hugging Face token for model authentication')
+    
     subparsers = parser.add_subparsers(dest='command', help='Available commands')
     
     # serve command
@@ -156,6 +160,10 @@ def main():
     waggle_parser.set_defaults(func=waggle_command)
     
     args = parser.parse_args()
+    
+    if args.hf_token:
+        os.environ["HF_TOKEN"] = args.hf_token
+        print("HF_TOKEN set from command line argument")
     
     if not args.command:
         parser.print_help()
