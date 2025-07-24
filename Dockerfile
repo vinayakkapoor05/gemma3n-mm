@@ -1,4 +1,4 @@
-ARG CUDA_VERSION=12.8.1
+ARG CUDA_VERSION=11.8.0
 ARG IMAGE_DISTRO=ubuntu22.04
 
 FROM nvidia/cuda:${CUDA_VERSION}-devel-${IMAGE_DISTRO} AS deps
@@ -25,7 +25,7 @@ ENV PATH=/opt/venv/bin:$PATH
 RUN uv pip install -U \
       torch torchvision torchaudio triton \
       uvicorn[standard] fastapi \
-      --extra-index-url https://download.pytorch.org/whl/cu128
+      --extra-index-url https://download.pytorch.org/whl/cu118
 
 FROM venv AS build
 WORKDIR /wheels
