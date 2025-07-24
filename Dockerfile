@@ -41,6 +41,19 @@ RUN uv clean && \
     apt-get clean && \
     rm -rf /var/cache/apt/*
 
+ENV HF_HOME=/hf_cache
+RUN mkdir -p /hf_cache/google/gemma-3n-e4b-it
+
+RUN --mount=type=secret,id=hf_token \
+    bash -euxc ' \
+      export HF_TOKEN="$(cat /run/secrets/hf_token)" && \
+      huggingface-cli download google/gemma-3n-e4b-it \
+        --repo-type model \
+        --cache-dir /hf_cache \
+        --local-dir /hf_cache/google/gemma-3n-e4b-it \
+        --resume --force \
+    '
+
 FROM nvidia/cuda:${CUDA_VERSION}-runtime-${IMAGE_DISTRO} AS runtime
 
 RUN apt-get update && \
@@ -51,6 +64,7 @@ RUN apt-get update && \
 ENV PATH=/opt/venv/bin:$PATH \
     HF_HOME=/hf_cache
 COPY --from=build /opt/venv /opt/venv
+COPY --from=build /hf_cache /hf_cache
 
 RUN pip uninstall -y opencv-python && \
     pip install --no-cache-dir opencv-python-headless
