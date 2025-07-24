@@ -1,4 +1,3 @@
-# syntax=docker/dockerfile:1.4
 ARG CUDA_VERSION=12.8.1
 ARG IMAGE_DISTRO=ubuntu22.04
 
@@ -44,13 +43,13 @@ RUN uv clean && \
 ENV HF_HOME=/hf_cache
 RUN mkdir -p /hf_cache/google/gemma-3n-e4b-it
 
-RUN --mount=type=secret,id=hf_token \
-    bash -euxc ' \
-      export HF_TOKEN="$(cat /run/secrets/hf_token)" && \
+ARG HF_TOKEN
+RUN bash -euxc ' \
       huggingface-cli download google/gemma-3n-e4b-it \
         --repo-type model \
         --cache-dir /hf_cache \
         --local-dir /hf_cache/google/gemma-3n-e4b-it \
+        --token "$HF_TOKEN" \
         --resume --force \
     '
 
@@ -63,6 +62,7 @@ RUN apt-get update && \
 
 ENV PATH=/opt/venv/bin:$PATH \
     HF_HOME=/hf_cache
+
 COPY --from=build /opt/venv /opt/venv
 COPY --from=build /hf_cache /hf_cache
 
