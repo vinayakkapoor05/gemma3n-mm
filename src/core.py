@@ -13,11 +13,11 @@ def initialize_model():
     
     if model is None or processor is None:
         print("Loading Gemma-3n model...")
-        MODEL_ID = os.getenv("IMG_MODEL", "google/gemma-3n-e4b-it")
+        MODEL_ID = os.getenv("IMG_MODEL", "google/gemma-3n-e2b-it")
         DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
         
         # Check if we have a local cache directory
-        local_model_path = f"/hf_cache/google/gemma-3n-e4b-it"
+        local_model_path = f"/hf_cache/google/gemma-3n-e2b-it"
         use_local = os.path.exists(local_model_path) and os.listdir(local_model_path)
         
         if use_local:

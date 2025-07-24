@@ -41,14 +41,14 @@ RUN uv clean && \
     rm -rf /var/cache/apt/*
 
 ENV HF_HOME=/hf_cache
-RUN mkdir -p /hf_cache/google/gemma-3n-e4b-it
+RUN mkdir -p /hf_cache/google/gemma-3n-e2b-it
 
 ARG HF_TOKEN
 RUN bash -euxc ' \
-      huggingface-cli download google/gemma-3n-e4b-it \
+      huggingface-cli download google/gemma-3n-e2b-it \
         --repo-type model \
         --cache-dir /hf_cache \
-        --local-dir /hf_cache/google/gemma-3n-e4b-it \
+        --local-dir /hf_cache/google/gemma-3n-e2b-it \
         --token "$HF_TOKEN" \
         --resume --force \
     '

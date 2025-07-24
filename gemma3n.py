@@ -54,7 +54,6 @@ def cli_command(args):
         sys.exit(1)
 
 def waggle_command(args):
-    """Handle waggle CLI commands by calling waggle_cli.py"""
     cmd = [sys.executable, "waggle_cli.py"]
     
     cmd.append(args.task)
