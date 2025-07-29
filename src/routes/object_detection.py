@@ -13,7 +13,7 @@ from PIL import Image, ImageDraw
 from src.core import generate_response
 from src.utils import save_to_temp, IMAGE_FILE_TYPES
 
-router = APIRouter()
+router = APIRouter(prefix="/vision", tags=["vision"])
 
 class BBox(BaseModel):
     x_min: float
@@ -30,7 +30,7 @@ class BoundingBoxDetectionResponse(BaseModel):
     image_with_boxes: Optional[str] = None   
 
 @router.post(
-    "/vision/bounding_box_detection",
+    "/bounding_box_detection",
     response_model=BoundingBoxDetectionResponse,
 )
 async def bounding_box_detection(

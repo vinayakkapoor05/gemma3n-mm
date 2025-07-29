@@ -92,13 +92,3 @@ async def image_change_detection(
         return {"reply": reply, "task": "image_change_detection"}
     except Exception as e:
         raise HTTPException(500, detail=str(e))
-
-
-@router.post("/bounding_box_detection")
-async def bounding_box_detection(
-    file: UploadFile = File(...),
-    features: str = Form(...),
-    max_new_tokens: int = Form(150),
-    draw_boxes: bool = Form(False),
-):
-    raise NotImplementedError("Bounding box detection is not implemented yet.")
