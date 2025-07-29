@@ -22,7 +22,7 @@ class BBox(BaseModel):
     y_max: float
 
 class BoundingBoxDetectionResponse(BaseModel):
-    task: str = Field("bounding_box_detection", const=True)
+    task: str = Field("bounding_box_detection", Literal=True)
     object: str
     detected: bool
     confidence: float = Field(..., ge=0.0, le=1.0)
